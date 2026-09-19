@@ -638,7 +638,7 @@ function revertFakeInfo(content, fakeUserId, userId) {
             shouldDecode = false;
         }
     }
-    content = content.replace(new RegExp(fakeUserId, 'g'), userId);
+    content = content.split(fakeUserId).join(userId);
     if (shouldDecode) {
         content = base64Encode(content);
     }
@@ -673,9 +673,27 @@ function xDe(b64, key) {
     return decoder.decode(out);
 }
 
+function isSafeIpUrl(urlStr) {
+    try {
+        const parsed = new URL(urlStr);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+        const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+        if (hostname === 'localhost' || hostname === '0.0.0.0' || hostname === '::1') return false;
+        if (/^(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(hostname)) return false;
+        if (/^(::ffff:)?(fe80|fc00|fd)/.test(hostname)) return false;
+        return true;
+    } catch (err) {
+        return false;
+    }
+}
+
 async function parseIpUrl(ip_url) {
     const newCsvUrls = [];
     const newTxtUrls = [];
+    if (!isSafeIpUrl(ip_url)) {
+        errorLogs('获取 IP_URL 文件内容失败：', new Error('Unsafe or invalid IP_URL'));
+        return { ipUrlCsvResult: [], ipUrlTxtResult: [] };
+    }
     try {
         const response = await fetch(ip_url);
         const text = await response.text();
